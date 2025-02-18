@@ -1,0 +1,16 @@
+[
+{
+  "modid": "keepxpmod",
+  "name": "KeepXPMod",
+  "description": "A simple mod that allows players to keep their XP after death.",
+  "version": "1.0",
+  "mcversion": "1.12.2",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["KingGunch"],
+  "credits": "Thanks to Forge and FML for providing the framework!",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
