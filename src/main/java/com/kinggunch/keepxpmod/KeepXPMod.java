@@ -37,7 +37,7 @@ public class KeepXPMod {
 
                 // Create a clickable teleport message
                 String command = "/tp " + player.getName() + " " + deathPos.getX() + " " + deathPos.getY() + " " + deathPos.getZ();
-                TextComponentString message = new TextComponentString("§6[Click here to return to your death location]");
+                TextComponentString message = new TextComponentString("Died again? Click to return to your death location :())");
                 message.setStyle(new Style().setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
 
                 // Send the clickable message to the player
