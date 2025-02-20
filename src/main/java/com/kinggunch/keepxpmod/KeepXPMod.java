@@ -1,77 +1,130 @@
 package com.kinggunch.keepxpmod;
 
+import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.text.Style;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.event.ClickEvent;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.GameType;
+import net.minecraft.world.World;
+
+import java.io.File;
 
 @Mod(modid = KeepXPMod.MODID, name = KeepXPMod.NAME, version = KeepXPMod.VERSION)
 public class KeepXPMod {
     public static final String MODID = "keepxpmod";
-    public static final String NAME = "KeepXPMod - Respawn Location";
+    public static final String NAME = "KeepXPMod";
     public static final String VERSION = "1.3";
+
+    // Config options
+    public static boolean enableXPKeep = true;
+    public static boolean enableTeleportMessage = true;
+
+    @Mod.EventHandler
+    public void preInit(FMLPreInitializationEvent event) {
+        loadConfig(new File(event.getModConfigurationDirectory(), "keepxpmod.cfg"));
+    }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         System.out.println(NAME + " is loaded!");
     }
 
-    @Mod.EventBusSubscriber
-    public static class RespawnHandler {
-        private static final String DEATH_DATA = "KeepXPModData";
+    private void loadConfig(File file) {
+        Configuration config = new Configuration(file);
+        enableXPKeep = config.getBoolean("enableXPKeep", "General", true, "Set to false to disable XP saving.");
+        enableTeleportMessage = config.getBoolean("enableTeleportMessage", "General", true, "Set to false to disable the death location teleport message.");
 
-        // Save player's exact death location on death
+        if (config.hasChanged()) {
+            config.save();
+        }
+    }
+
+    @Mod.EventBusSubscriber
+    public static class XPHandler {
+        private static final String XP_TAG = "SavedXP";
+
+        // Prevent XP from dropping on death (only if enabled)
+        @SubscribeEvent
+        public static void preventXPDrop(LivingExperienceDropEvent event) {
+            if (enableXPKeep && event.getEntity() instanceof EntityPlayer) {
+                event.setCanceled(true); // Stops XP orbs from dropping
+            }
+        }
+
+        // Save XP when the player dies (only if enabled)
+        @SubscribeEvent
+        public static void onPlayerDeath(PlayerEvent.Clone event) {
+            if (enableXPKeep && event.isWasDeath()) {
+                EntityPlayer original = event.getOriginal();
+                EntityPlayer newPlayer = event.getEntityPlayer();
+
+                int xp = original.experienceTotal; // Get total XP before death
+
+                // DEBUG LOGGING
+                System.out.println("[KeepXPMod] Saving XP: " + xp);
+
+                // Save XP to player's persistent NBT data
+                NBTTagCompound playerData = newPlayer.getEntityData();
+                playerData.setInteger(XP_TAG, xp);
+            }
+        }
+
+        // Restore XP when the player logs in after dying (only if enabled)
+        @SubscribeEvent
+        public static void onPlayerRespawn(PlayerEvent.Clone event) {
+            if (enableXPKeep && event.isWasDeath()) {
+                EntityPlayer newPlayer = event.getEntityPlayer();
+                NBTTagCompound playerData = newPlayer.getEntityData();
+
+                if (playerData.hasKey(XP_TAG)) {
+                    int savedXP = playerData.getInteger(XP_TAG);
+
+                    // DEBUG LOGGING
+                    System.out.println("[KeepXPMod] Restoring XP: " + savedXP);
+
+                    // Restore XP properly
+                    newPlayer.addExperience(savedXP);
+
+                    // Clear stored XP after restoring
+                    playerData.removeTag(XP_TAG);
+                } else {
+                    System.out.println("[KeepXPMod] No saved XP found!");
+                }
+            }
+        }
+
+        // Save player's death location and send a teleport message (only if enabled)
         @SubscribeEvent(priority = EventPriority.HIGHEST)
-        public static void onPlayerDeath(LivingDeathEvent event) {
-            if (event.getEntity() instanceof EntityPlayer) {
+        public static void onPlayerDeathLocation(LivingDeathEvent event) {
+            if (enableTeleportMessage && event.getEntity() instanceof EntityPlayer) {
                 EntityPlayer player = (EntityPlayer) event.getEntity();
                 BlockPos deathPos = player.getPosition();
+                World world = player.getEntityWorld();
 
                 // DEBUG: Log death position
                 System.out.println("[KeepXPMod] Saving Death Location: " + deathPos);
 
-                // Save death location in player's persistent NBT data
-                NBTTagCompound data = player.getEntityData();
-                NBTTagCompound deathData = new NBTTagCompound();
-                deathData.setInteger("SavedX", deathPos.getX());
-                deathData.setInteger("SavedY", deathPos.getY());
-                deathData.setInteger("SavedZ", deathPos.getZ());
-                data.setTag(DEATH_DATA, deathData);
-            }
-        }
+                // Create a clickable teleport message
+                String command = "/tp " + player.getName() + " " + deathPos.getX() + " " + deathPos.getY() + " " + deathPos.getZ();
+                TextComponentString message = new TextComponentString("Click here to return to your death location");
+                message.setStyle(new Style()
+                        .setUnderlined(true)  // Underlines text
+                        .setColor(net.minecraft.util.text.TextFormatting.GOLD)  // Sets color to gold
+                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
 
-        // Restore player to death location and set Creative mode on respawn
-        @SubscribeEvent(priority = EventPriority.HIGHEST)
-        public static void onPlayerRespawn(PlayerEvent.Clone event) {
-            if (event.isWasDeath()) { // Ensure this runs only on death, not dimension change
-                EntityPlayer newPlayer = event.getEntityPlayer();
-                NBTTagCompound data = newPlayer.getEntityData();
-
-                if (data.hasKey(DEATH_DATA)) {
-                    NBTTagCompound deathData = data.getCompoundTag(DEATH_DATA);
-                    int savedX = deathData.getInteger("SavedX");
-                    int savedY = deathData.getInteger("SavedY");
-                    int savedZ = deathData.getInteger("SavedZ");
-
-                    // DEBUG: Log teleportation location
-                    System.out.println("[KeepXPMod] Teleporting to: " + savedX + ", " + savedY + ", " + savedZ);
-
-                    // Teleport player to saved death location
-                    newPlayer.setPositionAndUpdate(savedX + 0.5, savedY, savedZ + 0.5);
-
-                    // Set player to creative mode to prevent instant death
-                    newPlayer.setGameType(GameType.CREATIVE);
-
-                    // Clear stored location after respawn
-                    data.removeTag(DEATH_DATA);
-                } else {
-                    System.out.println("[KeepXPMod] No saved location found, respawning normally.");
+                // Only send message on the client side
+                if (!world.isRemote) {
+                    player.sendMessage(message);
                 }
             }
         }
