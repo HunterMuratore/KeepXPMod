@@ -6,6 +6,7 @@ This mod allows players to keep their XP after dying while preventing XP orbs fr
 ## Features:
 - Prevents XP from dropping on death.
 - Restores XP immediately after respawn.
+- Provides a chat message with clickable coordinates to teleport to death location
 - Works on Forge 1.12.2.
 
 ## Installation:
