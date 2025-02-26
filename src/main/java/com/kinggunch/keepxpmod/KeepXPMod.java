@@ -103,28 +103,31 @@ public class KeepXPMod {
             }
         }
 
-        // Save player's death location and send a teleport message (only if enabled)
         @SubscribeEvent(priority = EventPriority.HIGHEST)
         public static void onPlayerDeathLocation(LivingDeathEvent event) {
             if (enableTeleportMessage && event.getEntity() instanceof EntityPlayer) {
                 EntityPlayer player = (EntityPlayer) event.getEntity();
                 BlockPos deathPos = player.getPosition();
-                World world = player.getEntityWorld();
 
-                // DEBUG: Log death position
-                System.out.println("[KeepXPMod] Saving Death Location: " + deathPos);
+                // Ensure the player has fully died (not just "downed" by HardcoreRevival)
+                if (!event.isCanceled()) {  // HardcoreRevival cancels this if the player is "downed"
+                    // DEBUG: Log true death position
+                    System.out.println("[KeepXPMod] Saving True Death Location: " + deathPos);
 
-                // Create a clickable teleport message
-                String command = "/tp " + player.getName() + " " + deathPos.getX() + " " + deathPos.getY() + " " + deathPos.getZ();
-                TextComponentString message = new TextComponentString("Click here to return to your death location");
-                message.setStyle(new Style()
-                        .setUnderlined(true)  // Underlines text
-                        .setColor(net.minecraft.util.text.TextFormatting.GOLD)  // Sets color to gold
-                        .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
-
-                // Only send message on the client side
-                if (!world.isRemote) {
-                    player.sendMessage(message);
+                    // Create a clickable teleport message
+                    String command = "/tp " + player.getName() + " " + deathPos.getX() + " " + deathPos.getY() + " " + deathPos.getZ();
+                    TextComponentString message = new TextComponentString("[Click here to return to your death location]");
+                    message.setStyle(new Style()
+                            .setUnderlined(true)  // Underlines text
+                            .setColor(net.minecraft.util.text.TextFormatting.GOLD)  // Sets color to gold
+                            .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
+                    // Only send message on the client side
+                    if (!player.getEntityWorld().isRemote) {
+                        player.sendMessage(message);
+                    }
+                } else {
+                    // DEBUG: Player was downed, not dead
+                    System.out.println("[KeepXPMod] Player is downed, not sending teleport message.");
                 }
             }
         }
