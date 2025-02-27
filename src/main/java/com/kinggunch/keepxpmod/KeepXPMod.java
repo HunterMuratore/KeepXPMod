@@ -15,7 +15,6 @@ import net.minecraft.util.text.Style;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.event.ClickEvent;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
 
 import java.io.File;
 
@@ -23,15 +22,17 @@ import java.io.File;
 public class KeepXPMod {
     public static final String MODID = "keepxpmod";
     public static final String NAME = "KeepXPMod";
-    public static final String VERSION = "1.3";
+    public static final String VERSION = "1.4";  // Updated version
 
     // Config options
     public static boolean enableXPKeep = true;
     public static boolean enableTeleportMessage = true;
+    public static boolean showDeathMessage = true;  // New config option
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
-        loadConfig(new File(event.getModConfigurationDirectory(), "keepxpmod.cfg"));
+        File configFile = new File(event.getModConfigurationDirectory(), "keepxpmod.cfg");
+        loadConfig(configFile);
     }
 
     @Mod.EventHandler
@@ -42,7 +43,13 @@ public class KeepXPMod {
     private void loadConfig(File file) {
         Configuration config = new Configuration(file);
         enableXPKeep = config.getBoolean("enableXPKeep", "General", true, "Set to false to disable XP saving.");
-        enableTeleportMessage = config.getBoolean("enableTeleportMessage", "General", true, "Set to false to disable the death location teleport message.");
+        enableTeleportMessage = config.getBoolean("enableTeleportMessage", "General", true, "Set to false to disable the teleport message.");
+        showDeathMessage = config.getBoolean("showDeathMessage", "General", true, "Set to false to disable the death message in chat.");
+
+        // Debug logs to verify config values are loading
+        System.out.println("[KeepXPMod] Config Loaded - enableXPKeep: " + enableXPKeep);
+        System.out.println("[KeepXPMod] Config Loaded - enableTeleportMessage: " + enableTeleportMessage);
+        System.out.println("[KeepXPMod] Config Loaded - showDeathMessage: " + showDeathMessage);
 
         if (config.hasChanged()) {
             config.save();
@@ -103,6 +110,7 @@ public class KeepXPMod {
             }
         }
 
+        // Send teleport message on death, but only if enabled in config
         @SubscribeEvent(priority = EventPriority.HIGHEST)
         public static void onPlayerDeathLocation(LivingDeathEvent event) {
             if (enableTeleportMessage && event.getEntity() instanceof EntityPlayer) {
@@ -114,16 +122,20 @@ public class KeepXPMod {
                     // DEBUG: Log true death position
                     System.out.println("[KeepXPMod] Saving True Death Location: " + deathPos);
 
-                    // Create a clickable teleport message
-                    String command = "/tp " + player.getName() + " " + deathPos.getX() + " " + deathPos.getY() + " " + deathPos.getZ();
-                    TextComponentString message = new TextComponentString("[Click here to return to your death location]");
-                    message.setStyle(new Style()
-                            .setUnderlined(true)  // Underlines text
-                            .setColor(net.minecraft.util.text.TextFormatting.GOLD)  // Sets color to gold
-                            .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
-                    // Only send message on the client side
-                    if (!player.getEntityWorld().isRemote) {
-                        player.sendMessage(message);
+                    // Only send the teleport message if enabled
+                    if (showDeathMessage) {
+                        // Create a clickable teleport message
+                        String command = "/tp " + player.getName() + " " + deathPos.getX() + " " + deathPos.getY() + " " + deathPos.getZ();
+                        TextComponentString message = new TextComponentString("[Click here to return to your death location]");
+                        message.setStyle(new Style()
+                                .setUnderlined(true)  // Underlines text
+                                .setColor(net.minecraft.util.text.TextFormatting.GOLD)  // Sets color to gold
+                                .setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
+
+                        // Only send message on the client side
+                        if (!player.getEntityWorld().isRemote) {
+                            player.sendMessage(message);
+                        }
                     }
                 } else {
                     // DEBUG: Player was downed, not dead
